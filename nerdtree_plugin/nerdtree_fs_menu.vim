@@ -159,7 +159,7 @@ endfunction
 function! NERDTreeAddNode()
     let curDirNode = g:NERDTreeDirNode.GetSelected()
     let prompt = s:inputPrompt('add')
-    let newNodeName = input(prompt, curDirNode.path.str() . g:NERDTreePath.Slash(), 'file')
+    let newNodeName = input(prompt, curDirNode.path.str() . nerdtree#slash(), 'file')
 
     if newNodeName ==# ''
         call nerdtree#echo('Node Creation Aborted.')
@@ -246,13 +246,11 @@ endfunction
 
 " FUNCTION: NERDTreeDeleteNode() {{{1
 function! NERDTreeDeleteNode()
-    let l:shellslash = &shellslash
-    let &shellslash = 0
     let currentNode = g:NERDTreeFileNode.GetSelected()
     let confirmed = 0
 
     if currentNode.path.isDirectory && ((currentNode.isOpen && currentNode.getChildCount() > 0) ||
-                                      \ (len(currentNode._glob('*', 1)) > 0))
+                \ (len(currentNode._glob('*', 1)) > 0))
         let prompt = s:inputPrompt('deleteNonEmpty') . currentNode.path.str() . ': '
         let choice = input(prompt)
         let confirmed = choice ==# 'yes'
@@ -283,7 +281,6 @@ function! NERDTreeDeleteNode()
     else
         call nerdtree#echo('delete aborted')
     endif
-    let &shellslash = l:shellslash
 endfunction
 
 " FUNCTION: NERDTreeListNode() {{{1
@@ -298,8 +295,8 @@ function! NERDTreeListNode()
         endif
 
         let cmd = 'size=$(' . stat_cmd . shellescape(treenode.path.str()) . ') && ' .
-        \         'size_with_commas=$(echo $size | sed -e :a -e "s/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta") && ' .
-        \         'ls -ld ' . shellescape(treenode.path.str()) . ' | sed -e "s/ $size / $size_with_commas /"'
+                    \         'size_with_commas=$(echo $size | sed -e :a -e "s/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta") && ' .
+                    \         'ls -ld ' . shellescape(treenode.path.str()) . ' | sed -e "s/ $size / $size_with_commas /"'
 
         let metadata = split(system(cmd),'\n')
         call nerdtree#echo(metadata[0])
@@ -328,8 +325,6 @@ endfunction
 
 " FUNCTION: NERDTreeCopyNode() {{{1
 function! NERDTreeCopyNode()
-    let l:shellslash = &shellslash
-    let &shellslash = 0
     let currentNode = g:NERDTreeFileNode.GetSelected()
     let prompt = s:inputPrompt('copy')
     let newNodePath = input(prompt, currentNode.path.str(), 'file')
@@ -365,7 +360,6 @@ function! NERDTreeCopyNode()
     else
         call nerdtree#echo('Copy aborted.')
     endif
-    let &shellslash = l:shellslash
     redraw!
 endfunction
 
