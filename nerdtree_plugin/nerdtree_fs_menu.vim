@@ -250,7 +250,7 @@ function! NERDTreeDeleteNode()
     let confirmed = 0
 
     if currentNode.path.isDirectory && ((currentNode.isOpen && currentNode.getChildCount() > 0) ||
-                \ (len(currentNode._glob('*', 1)) > 0))
+                                      \ (len(currentNode._glob('*', 1)) > 0))
         let prompt = s:inputPrompt('deleteNonEmpty') . currentNode.path.str() . ': '
         let choice = input(prompt)
         let confirmed = choice ==# 'yes'
@@ -295,8 +295,8 @@ function! NERDTreeListNode()
         endif
 
         let cmd = 'size=$(' . stat_cmd . shellescape(treenode.path.str()) . ') && ' .
-                    \         'size_with_commas=$(echo $size | sed -e :a -e "s/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta") && ' .
-                    \         'ls -ld ' . shellescape(treenode.path.str()) . ' | sed -e "s/ $size / $size_with_commas /"'
+        \         'size_with_commas=$(echo $size | sed -e :a -e "s/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta") && ' .
+        \         'ls -ld ' . shellescape(treenode.path.str()) . ' | sed -e "s/ $size / $size_with_commas /"'
 
         let metadata = split(system(cmd),'\n')
         call nerdtree#echo(metadata[0])
@@ -452,6 +452,23 @@ function! NERDTreeExecuteFileWindows()
     endif
 
     call system('cmd.exe /c start "" ' . shellescape(l:node.path.str()))
+endfunction
+
+" FUNCTION: NERDTreeSystemCommand() {{{1
+function! NERDTreeSystemCommand()
+    let l:node = g:NERDTreeFileNode.GetSelected()
+
+    if empty(l:node)
+        return
+    endif
+
+    let l:cwd = getcwd()
+    let l:directory = l:node.path.isDirectory ? l:node.path.str() : l:node.parent.path.str()
+    execute 'cd '.l:directory
+
+    let l:nl = nr2char(10)
+    echo l:nl . system(input(l:directory . (nerdtree#runningWindows() ? '> ' : ' $ ')))
+    execute 'cd '.l:cwd
 endfunction
 
 " vim: set sw=4 sts=4 et fdm=marker:
