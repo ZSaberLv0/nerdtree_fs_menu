@@ -1,17 +1,19 @@
 
 replacement for original nerdtree fs menu
 
-usage:
+recommended usage:
 
 ```
-Plug 'scrooloose/nerdtree'
+Plugin 'scrooloose/nerdtree'
+Plugin 'ZSaberLv0/nerdtree_menu_util'
 
-Plug 'ZSaberLv0/nerdtree_fs_menu'
+" optional, auto backup for destructive operations
+Plugin 'ZSaberLv0/ZFVimBackup'
+
+" optional, remove some useless builtin menu item to prevent key conflict
+Plugin 'ZSaberLv0/nerdtree_fs_menu'
 let g:loaded_nerdtree_exec_menuitem = 1
 let g:loaded_nerdtree_fs_menu = 1
-
-" recommended to install this too
-Plug 'ZSaberLv0/nerdtree_menu_util'
 ```
 
 why:
