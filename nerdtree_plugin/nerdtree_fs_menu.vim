@@ -138,18 +138,38 @@ function! s:renameBuffer(bufNum, newNodeName, isDirectory)
         let quotedFileName = fnameescape(a:newNodeName)
         let editStr = g:NERDTreePath.New(a:newNodeName).str({'format': 'Edit'})
     endif
-    " 1. ensure that a new buffer is loaded
-    call nerdtree#exec('badd ' . quotedFileName, 0)
-    " 2. ensure that all windows which display the just deleted filename
-    " display a buffer for a new filename.
     let s:originalTabNumber = tabpagenr()
     let s:originalWindowNumber = winnr()
-    call nerdtree#exec('tabdo windo if winbufnr(0) ==# ' . a:bufNum . " | exec ':e! " . editStr . "' | endif", 0)
-    call nerdtree#exec('tabnext ' . s:originalTabNumber, 1)
-    call nerdtree#exec(s:originalWindowNumber . 'wincmd w', 1)
-    " 3. We don't need a previous buffer anymore
+    let l:tempBufferName = 'NERDTreeRenameTempBuffer'
+
+    " 1. swap deleted file buffer with a temporary one
+    " this step is needed to compensate for case insensitive filesystems
+
+    " 1.1. create an intermediate(temporary) buffer
+    call nerdtree#exec('badd ' . l:tempBufferName, 0)
+    let l:tempBufNum = bufnr(l:tempBufferName)
+    " 1.2. ensure that all windows which display the just deleted filename
+    " display the new temp buffer.
+    call nerdtree#exec('tabdo windo if winbufnr(0) ==# ' . a:bufNum . " | exec ':e! " . l:tempBufferName . "' | endif", 0)
+    " 1.3. We don't need the deleted file buffer anymore
     try
         call nerdtree#exec('confirm bwipeout ' . a:bufNum, 0)
+    catch
+        " This happens when answering Cancel if confirmation is needed. Do nothing.
+    endtry
+
+    " 2. swap temporary buffer with the new filename buffer
+    " 2.1. create the actual new file buffer
+    call nerdtree#exec('badd ' . quotedFileName, 0)
+
+    " 2.2. ensure that all windows which display the temporary buffer
+    " display a buffer for the new filename.
+    call nerdtree#exec('tabdo windo if winbufnr(0) ==# ' . l:tempBufNum . " | exec ':e! " . editStr . "' | endif", 0)
+    call nerdtree#exec('tabnext ' . s:originalTabNumber, 1)
+    call nerdtree#exec(s:originalWindowNumber . 'wincmd w', 1)
+    " 2.3. We don't need the temporary buffer anymore
+    try
+        call nerdtree#exec('confirm bwipeout ' . l:tempBufNum, 0)
     catch
         " This happens when answering Cancel if confirmation is needed. Do nothing.
     endtry
@@ -159,7 +179,7 @@ endfunction
 function! NERDTreeAddNode()
     let curDirNode = g:NERDTreeDirNode.GetSelected()
     let prompt = s:inputPrompt('add')
-    let newNodeName = input(prompt, curDirNode.path.str() . nerdtree#slash(), 'file')
+    let newNodeName = substitute(input(prompt, curDirNode.path.str() . nerdtree#slash(), 'file'), '\(^\s*\|\s*$\)', '', 'g')
 
     if newNodeName ==# ''
         call nerdtree#echo('Node Creation Aborted.')
@@ -195,8 +215,25 @@ function! NERDTreeMoveNode()
     let prompt = s:inputPrompt('move')
     let newNodePath = input(prompt, curNode.path.str(), 'file')
     while filereadable(newNodePath)
-        call nerdtree#echoWarning('This destination already exists. Try again.')
-        let newNodePath = input(prompt, curNode.path.str(), 'file')
+        " allow renames with different casing when g:NERDTreeCaseSensitiveFS
+        " is set to either 0 or 3 and the 2 paths are equal
+        if (g:NERDTreeCaseSensitiveFS == 0 || g:NERDTreeCaseSensitiveFS == 3) &&
+                    \nerdtree#pathEquals(curNode.path.str(), newNodePath)
+            break
+        endif
+
+        call nerdtree#echoWarning('This destination already exists, Try again.')
+
+        " inform the user about the flag if we think it is a false positive
+        " when g:NERDTreeCaseSensitiveFS is set to 2
+        if g:NERDTreeCaseSensitiveFS == 2 &&
+                    \!nerdtree#osDefaultCaseSensitiveFS() &&
+                    \nerdtree#pathEquals(curNode.path.str(), newNodePath)
+            echon "\n(If it is a false positive please consider assigning NERDTreeCaseSensitiveFS's value)"
+        endif
+
+        " prompt the user again
+        let newNodePath = substitute(input(prompt, curNode.path.str(), 'file'), '\(^\s*\|\s*$\)', '', 'g')
     endwhile
 
 
@@ -323,11 +360,34 @@ function! NERDTreeListNodeWin32()
     call nerdtree#echo('node not recognized')
 endfunction
 
+" FUNCTION: NERDTreeChangePermissions() {{{1
+function! NERDTreeChangePermissions()
+    let l:node = g:NERDTreeFileNode.GetSelected()
+    let l:prompt = "change node permissions (chmod args): "
+    let l:newNodePerm = input(l:prompt)
+
+    if !empty(l:node)
+        let l:path = l:node.path.str()
+        let l:cmd = 'chmod ' .. newNodePerm .. ' ' .. path
+        let l:error = split(system(l:cmd), '\n')
+
+        if !empty(l:error)
+            call nerdtree#echo(l:error[0])
+        endif
+
+        call b:NERDTree.root.refresh()
+        call b:NERDTree.render()
+        return
+    endif
+
+    call nerdtree#echo('node not recognized')
+endfunction
+
 " FUNCTION: NERDTreeCopyNode() {{{1
 function! NERDTreeCopyNode()
     let currentNode = g:NERDTreeFileNode.GetSelected()
     let prompt = s:inputPrompt('copy')
-    let newNodePath = input(prompt, currentNode.path.str(), 'file')
+    let newNodePath = substitute(input(prompt, currentNode.path.str(), 'file'), '\(^\s*\|\s*$\)', '', 'g')
 
     if newNodePath !=# ''
         "strip trailing slash
@@ -441,6 +501,17 @@ function! NERDTreeExecuteFileLinux()
     endif
 
     call system('xdg-open ' . shellescape(l:node.path.str()))
+endfunction
+
+" FUNCTION: NERDTreeRevealInExplorer() {{{1
+function! NERDTreeRevealInExplorer()
+    let l:node = g:NERDTreeFileNode.GetSelected()
+
+    if empty(l:node)
+        return
+    endif
+
+    call system('cmd.exe /c explorer /select, ' . shellescape(l:node.path.str()))
 endfunction
 
 " FUNCTION: NERDTreeExecuteFileWindows() {{{1
