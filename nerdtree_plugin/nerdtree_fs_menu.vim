@@ -1,4 +1,15 @@
 
+" ============================================================
+function! NERDTreeRemoveMenuItem(callback)
+    let menuItems = g:NERDTreeMenuItem.All()
+    let i = len(menuItems) - 1
+    while i >= 0
+        if menuItems[i]['callback'] == a:callback
+            call remove(menuItems, i)
+        endif
+        let i -= 1
+    endwhile
+endfunction
 function! s:setupModule(module, enable, text, key, callback)
     if !exists('g:nfm_' . a:module . '_enable')
         execute 'let g:nfm_' . a:module . '_enable=' . a:enable
@@ -10,6 +21,7 @@ function! s:setupModule(module, enable, text, key, callback)
         execute 'let g:nfm_' . a:module . '_key="' . a:key . '"'
     endif
     if eval('g:nfm_' . a:module . '_enable')
+        call NERDTreeRemoveMenuItem(a:callback)
         call NERDTreeAddMenuItem({
                     \ 'text': eval('g:nfm_' . a:module . '_text'),
                     \ 'shortcut': eval('g:nfm_' . a:module . '_key'),
